@@ -1,0 +1,18 @@
+# Virtual environment / env files
+.venv/
+venv/
+.env
+
+# Python bytecode/cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE / editor local settings
+.vscode/
+.idea/
+
+# OS cruft
+.DS_Store
+Thumbs.db
