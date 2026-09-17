@@ -13,6 +13,7 @@ from typing import List, Literal
 
 import joblib
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
 import pipeline_def  # noqa: F401  # required so joblib can resolve HeroRecommenderTransformer
@@ -29,6 +30,19 @@ InputLiteral = Literal["PC", "Console"]
 RegionLiteral = Literal["Americas", "Europe", "Asia"]
 
 app = FastAPI(title=SERVICE_NAME)
+
+# The frontend (a static site, eventually hosted on Vercel) calls this API
+# directly from the browser. This is a public, read-only recommendation
+# endpoint with no auth/cookies/session state, so allowing any origin is
+# sufficient for this assignment rather than hardcoding a specific Vercel
+# domain that doesn't exist yet. This does not weaken request validation -
+# Pydantic still rejects invalid bodies with 422 regardless of origin.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 _bundle = None
 _load_error = None
@@ -96,6 +110,41 @@ def root():
         "pipeline_steps": metadata["steps"],
         "built_at": metadata["built_at"],
         "sklearn_version": metadata["sklearn_version"],
+    }
+
+
+@app.get("/health")
+def health():
+    """Lightweight liveness/health check, distinct from /pipeline's fuller
+    artifact metadata. Uses the already-loaded bundle - no re-loading, no
+    recommendation logic."""
+    if _bundle is None:
+        raise HTTPException(status_code=503, detail=_unavailable_detail())
+
+    return {
+        "service": SERVICE_NAME,
+        "status": "healthy",
+        "artifact_loaded": True,
+    }
+
+
+@app.get("/pipeline")
+def pipeline_info():
+    """Artifact/pipeline metadata, exposed separately from /health so the two
+    concerns (is the service up vs. what pipeline is it running) are
+    independently testable."""
+    if _bundle is None:
+        raise HTTPException(status_code=503, detail=_unavailable_detail())
+
+    metadata = _bundle["metadata"]
+    return {
+        "service": SERVICE_NAME,
+        "status": "ok",
+        "artifact_loaded": True,
+        "pipeline_steps": metadata["steps"],
+        "built_at": metadata["built_at"],
+        "sklearn_version": metadata["sklearn_version"],
+        "python_version": metadata.get("python_version"),
     }
 
 

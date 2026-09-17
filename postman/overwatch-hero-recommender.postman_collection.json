@@ -1,0 +1,192 @@
+{
+  "info": {
+    "_postman_id": "5b2a5e9a-2c3f-4a7d-9b1e-3f1c9a2c7e10",
+    "name": "Overwatch Hero Recommender (Deployed Modal API)",
+    "description": "Tests against the deployed Modal-hosted FastAPI recommendation service. All requests use {{baseUrl}}, which points at the public Modal deployment - never localhost.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://rshea42--overwatch-hero-recommender-fastapi-app.modal.run",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Service reports healthy and artifact loaded\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.status).to.eql(\"healthy\");",
+              "    pm.expect(json.artifact_loaded).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pipeline Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/pipeline",
+          "host": ["{{baseUrl}}"],
+          "path": ["pipeline"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Pipeline steps are present\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.pipeline_steps).to.be.an(\"array\").that.is.not.empty;",
+              "});",
+              "",
+              "pm.test(\"sklearn_version is present\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.sklearn_version).to.be.a(\"string\").and.not.empty;",
+              "});",
+              "",
+              "pm.test(\"built_at is present\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.built_at).to.be.a(\"string\").and.not.empty;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Valid Recommendation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"heroes\":[\"soldier-76\"],\"rank\":\"Silver\",\"input\":\"PC\",\"region\":\"Americas\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/recommend",
+          "host": ["{{baseUrl}}"],
+          "path": ["recommend"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"recommendations exists\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property(\"recommendations\");",
+              "});",
+              "",
+              "pm.test(\"there are exactly 2 recommendations\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.recommendations).to.have.lengthOf(2);",
+              "});",
+              "",
+              "pm.test(\"first recommended hero is symmetra\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.recommendations[0].recommended_hero).to.eql(\"symmetra\");",
+              "});",
+              "",
+              "pm.test(\"second recommended hero is widowmaker\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.recommendations[1].recommended_hero).to.eql(\"widowmaker\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invalid Recommendation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"heroes\":[\"soldier-76\"],\"rank\":\"NotARank\",\"input\":\"PC\",\"region\":\"Americas\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/recommend",
+          "host": ["{{baseUrl}}"],
+          "path": ["recommend"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 422\", function () {",
+              "    pm.response.to.have.status(422);",
+              "});",
+              "",
+              "pm.test(\"validation detail is present\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json).to.have.property(\"detail\");",
+              "    pm.expect(json.detail).to.not.be.empty;",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

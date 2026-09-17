@@ -131,9 +131,25 @@ class HeroRecommenderTransformer(BaseEstimator, TransformerMixin):
             winner_row = scores_df.iloc[0]
             recommended_hero = winner_row["candidate"]
 
+            # Explainability lists: the same opponent IDs the existing counts
+            # (vulnerabilities_before / vulnerabilities_resolved) are derived
+            # from. Resolution check mirrors er.compute_candidate_score exactly
+            # (candidate_value >= 0, skipping opponents with no known value)
+            # so vulnerability_heroes_resolved always agrees with the count
+            # Formula C itself already produced.
+            vulnerability_heroes_before = sorted(vulnerabilities.keys())
+            vulnerability_heroes_resolved = sorted(
+                opponent
+                for opponent in vulnerabilities
+                if er.get_matchup_value(matchup_dict, recommended_hero, opponent) is not None
+                and er.get_matchup_value(matchup_dict, recommended_hero, opponent) >= 0
+            )
+
             roster.append(recommended_hero)
             pool_values_after = er.compute_pool_values(matchup_dict, roster, opponent_pool)
-            remaining_negative_count = len(er.get_vulnerabilities(pool_values_after))
+            vulnerabilities_after = er.get_vulnerabilities(pool_values_after)
+            remaining_negative_count = len(vulnerabilities_after)
+            remaining_negative_heroes = sorted(vulnerabilities_after.keys())
 
             recommendations.append(
                 {
@@ -142,6 +158,9 @@ class HeroRecommenderTransformer(BaseEstimator, TransformerMixin):
                     "vulnerabilities_before": len(vulnerabilities),
                     "vulnerabilities_resolved": int(winner_row["vulnerabilities_resolved"]),
                     "remaining_negative_count": remaining_negative_count,
+                    "vulnerability_heroes_before": vulnerability_heroes_before,
+                    "vulnerability_heroes_resolved": vulnerability_heroes_resolved,
+                    "remaining_negative_heroes": remaining_negative_heroes,
                     "contextual_winrate": winner_row["contextual_winrate"],
                     "contextual_pickrate": winner_row["contextual_pickrate"],
                     "contextual_banrate": winner_row["contextual_banrate"],
