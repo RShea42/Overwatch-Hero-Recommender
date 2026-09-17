@@ -75,7 +75,7 @@ def parse_records(payload, rank, input_value, region):
     records = []
     for row in payload["rates"]["rates"]:
         hero = row.get("hero", {})
-        if hero.get("role") != "DAMAGE":
+        if hero.get("role") not in ("DAMAGE", "TANK", "SUPPORT"):
             continue
         cells = row.get("cells", {})
         records.append(

@@ -107,7 +107,14 @@ class HeroRecommenderTransformer(BaseEstimator, TransformerMixin):
         )
         self.all_heroes_ = all_heroes
         self.opponent_pool_ = list(all_heroes)
-        self.damage_heroes_ = sorted(self.rank_df["hero_id"].unique())
+        # Role-specific eligible candidate pools (e.g. "DAMAGE"/"TANK"/
+        # "SUPPORT"), derived from rank_df. Matchup evaluation itself stays
+        # role-agnostic - opponent_pool_/matchup_dict_ always cover the
+        # complete roster regardless of which role's pool is being built.
+        self.heroes_by_role_ = {
+            role: sorted(group["hero_id"].unique())
+            for role, group in self.rank_df.groupby("role")
+        }
         self.matchup_dict_ = build_symmetric_matchup_dict(self.matchups_df, all_heroes)
         return self
 
@@ -158,32 +165,41 @@ class HeroRecommenderTransformer(BaseEstimator, TransformerMixin):
             ascending=[False, False, False, True],
         ).reset_index(drop=True)
 
-    def _recommend_next(self, roster, rank, input_value, region):
+    def _recommend_next(self, roster, role, rank, input_value, region):
         """Mirrors the original recommend_next_hero, now reading fitted state
-        (self.matchup_dict_, self.damage_heroes_, self.opponent_pool_) instead
-        of rebuilding it. `roster` is an arbitrary list of heroes, not
-        hardcoded slots - reusable for evaluating any N-hero pool later."""
+        (self.matchup_dict_, self.heroes_by_role_, self.opponent_pool_)
+        instead of rebuilding it. `roster` is an arbitrary list of heroes,
+        not hardcoded slots - reusable for evaluating any N-hero pool later.
+        Matchup evaluation (pool_values/vulnerabilities) is always computed
+        against the complete opponent_pool_, regardless of role; only the
+        candidate pool being scored is role-restricted."""
         pool_values = compute_pool_values(self.matchup_dict_, roster, self.opponent_pool_)
         vulnerabilities = get_vulnerabilities(pool_values)
 
-        candidate_pool = [hero for hero in self.damage_heroes_ if hero not in roster]
+        eligible_heroes = self.heroes_by_role_.get(role, [])
+        candidate_pool = [hero for hero in eligible_heroes if hero not in roster]
         scores_df = self._score_candidates(candidate_pool, vulnerabilities, rank, input_value, region)
 
         return scores_df, vulnerabilities, pool_values
 
     def _recommend_for_request(self, record):
         heroes = list(record["heroes"])
+        role = record["role"]
         rank = record["rank"]
         input_value = record["input"]
         region = record["region"]
 
+        eligible_heroes = self.heroes_by_role_.get(role)
+        if not eligible_heroes:
+            raise ValueError(f"Unknown or empty role: {role!r}")
+
         if len(heroes) not in (1, 2):
             raise ValueError(
-                f"'heroes' must contain 1 or 2 Damage hero IDs, got {len(heroes)}: {heroes}"
+                f"'heroes' must contain 1 or 2 {role} hero IDs, got {len(heroes)}: {heroes}"
             )
         for hero in heroes:
-            if hero not in self.damage_heroes_:
-                raise ValueError(f"Unknown Damage hero id: {hero!r}")
+            if hero not in eligible_heroes:
+                raise ValueError(f"Unknown {role} hero id: {hero!r}")
 
         roster = list(heroes)
         num_recommendations = 2 if len(heroes) == 1 else 1
@@ -192,7 +208,7 @@ class HeroRecommenderTransformer(BaseEstimator, TransformerMixin):
         for _ in range(num_recommendations):
             roster_before = list(roster)
 
-            scores_df, vulnerabilities, _ = self._recommend_next(roster, rank, input_value, region)
+            scores_df, vulnerabilities, _ = self._recommend_next(roster, role, rank, input_value, region)
             winner_row = scores_df.iloc[0]
             recommended_hero = winner_row["candidate"]
 
@@ -234,6 +250,7 @@ class HeroRecommenderTransformer(BaseEstimator, TransformerMixin):
 
         return {
             "input_heroes": heroes,
+            "role": role,
             "rank": rank,
             "input": input_value,
             "region": region,

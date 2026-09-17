@@ -96,7 +96,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"heroes\":[\"soldier-76\"],\"rank\":\"Silver\",\"input\":\"PC\",\"region\":\"Americas\"}",
+          "raw": "{\"heroes\":[\"soldier-76\"],\"role\":\"Damage\",\"rank\":\"Silver\",\"input\":\"PC\",\"region\":\"Americas\"}",
           "options": {
             "raw": {
               "language": "json"
@@ -155,7 +155,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"heroes\":[\"soldier-76\"],\"rank\":\"NotARank\",\"input\":\"PC\",\"region\":\"Americas\"}",
+          "raw": "{\"heroes\":[\"soldier-76\"],\"role\":\"Damage\",\"rank\":\"NotARank\",\"input\":\"PC\",\"region\":\"Americas\"}",
           "options": {
             "raw": {
               "language": "json"

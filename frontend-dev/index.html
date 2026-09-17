@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hero Pool Builder (Dev)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="page-header">
+      <div class="brand">
+        <span class="brand-mark">OW</span>
+        <div class="brand-text">
+          <h1>Hero Pool Builder</h1>
+          <p>Matchup-coverage recommendations for your Overwatch roster</p>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel form-panel">
+        <h2>Build Your Pool</h2>
+        <form id="pool-form">
+          <div class="field">
+            <label for="role">Role</label>
+            <select id="role">
+              <option>Damage</option>
+              <option>Tank</option>
+              <option>Support</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="hero1">Current Hero <span class="required">*</span></label>
+            <select id="hero1" required></select>
+          </div>
+
+          <div class="field">
+            <label for="hero2">Second Current Hero <span class="optional">(optional)</span></label>
+            <select id="hero2">
+              <option value="">None</option>
+            </select>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="rank">Rank</label>
+              <select id="rank">
+                <option>Bronze</option>
+                <option>Silver</option>
+                <option>Gold</option>
+                <option>Platinum</option>
+                <option>Emerald</option>
+                <option>Diamond</option>
+                <option>Master</option>
+                <option>Grandmaster</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="input">Input</label>
+              <select id="input">
+                <option>PC</option>
+                <option>Console</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="region">Region</label>
+              <select id="region">
+                <option>Americas</option>
+                <option>Europe</option>
+                <option>Asia</option>
+              </select>
+            </div>
+          </div>
+
+          <p id="form-error" class="form-error" hidden></p>
+
+          <button type="submit" id="submit-btn" class="build-btn">Build My Hero Pool</button>
+        </form>
+      </section>
+
+      <section class="panel results-panel">
+        <div id="status-empty" class="status-message">
+          Select your hero(s) and context, then build your pool.
+        </div>
+
+        <div id="status-loading" class="status-message" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          Calculating recommendations&hellip;
+        </div>
+
+        <div id="status-error" class="status-message status-message-error" hidden></div>
+
+        <div id="results" class="results" hidden>
+          <div class="context-bar">
+            <span class="context-chip" id="context-role"></span>
+            <span class="context-chip" id="context-rank"></span>
+            <span class="context-chip" id="context-input"></span>
+            <span class="context-chip" id="context-region"></span>
+          </div>
+
+          <div id="steps"></div>
+
+          <div class="final-pool-wrapper">
+            <h3>Completed Three-Hero Pool</h3>
+            <div class="final-pool" id="final-pool"></div>
+            <p class="final-negative" id="final-negative"></p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      Data-driven hero matchup coverage &middot; live results from the deployed recommendation API
+    </footer>
+  </div>
+
+  <script src="heroes.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

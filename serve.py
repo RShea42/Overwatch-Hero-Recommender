@@ -14,7 +14,7 @@ from typing import List, Literal
 import joblib
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 import pipeline_def  # noqa: F401  # required so joblib can resolve HeroRecommenderTransformer
 
@@ -28,6 +28,7 @@ RankLiteral = Literal[
 ]
 InputLiteral = Literal["PC", "Console"]
 RegionLiteral = Literal["Americas", "Europe", "Asia"]
+RoleLiteral = Literal["Tank", "Damage", "Support"]
 
 app = FastAPI(title=SERVICE_NAME)
 
@@ -74,27 +75,31 @@ def _unavailable_detail():
 
 class RecommendRequest(BaseModel):
     heroes: List[str] = Field(..., min_length=1, max_length=2)
+    role: RoleLiteral
     rank: RankLiteral
     input: InputLiteral
     region: RegionLiteral
 
     @field_validator("heroes")
     @classmethod
-    def validate_heroes(cls, heroes: List[str]) -> List[str]:
+    def validate_no_duplicates(cls, heroes: List[str]) -> List[str]:
         if len(set(heroes)) != len(heroes):
             raise ValueError("duplicate hero IDs are not allowed")
-
-        # Hero-ID-vs-Damage-roster validation depends on the loaded artifact.
-        # If the artifact isn't loaded, skip this check here and let the
-        # endpoint itself report 503 - a missing artifact is a service
-        # problem, not a client validation problem.
-        if _bundle is not None:
-            damage_heroes = set(_bundle["damage_heroes"])
-            unknown = [h for h in heroes if h not in damage_heroes]
-            if unknown:
-                raise ValueError(f"unknown Damage hero id(s): {unknown}")
-
         return heroes
+
+    @model_validator(mode="after")
+    def validate_heroes_match_role(self):
+        # Hero-ID-vs-role validation depends on the loaded artifact and needs
+        # both `heroes` and `role`, hence a model-level (not field-level)
+        # validator. If the artifact isn't loaded, skip this check here and
+        # let the endpoint itself report 503 - a missing artifact is a
+        # service problem, not a client validation problem.
+        if _bundle is not None:
+            eligible = set(_bundle["heroes_by_role"].get(self.role.upper(), []))
+            unknown = [h for h in self.heroes if h not in eligible]
+            if unknown:
+                raise ValueError(f"hero id(s) not valid for role {self.role!r}: {unknown}")
+        return self
 
 
 @app.get("/")
@@ -154,5 +159,10 @@ def recommend(request: RecommendRequest):
         raise HTTPException(status_code=503, detail=_unavailable_detail())
 
     pipeline = _bundle["pipeline"]
-    result = pipeline.transform([request.model_dump()])
+    payload = request.model_dump()
+    # heroes_by_role_ keys come from rank_df's role column (Blizzard's own
+    # "TANK"/"DAMAGE"/"SUPPORT" casing); the API accepts the friendlier
+    # Title-case values, normalized here at the boundary.
+    payload["role"] = payload["role"].upper()
+    result = pipeline.transform([payload])
     return result[0]

@@ -30,7 +30,9 @@ def build_bundle():
     # this is what gets serialized below, not recomputed at request time.
     pipeline.fit(X=[])
 
-    damage_heroes = sorted(rank_df["hero_id"].unique())
+    heroes_by_role = {
+        role: sorted(group["hero_id"].unique()) for role, group in rank_df.groupby("role")
+    }
     all_heroes = sorted(set(matchups_df["hero_id"]) | set(matchups_df["opponent_id"]))
 
     bundle = {
@@ -41,7 +43,7 @@ def build_bundle():
             "sklearn_version": sklearn.__version__,
             "python_version": platform.python_version(),
         },
-        "damage_heroes": damage_heroes,
+        "heroes_by_role": heroes_by_role,
         "all_heroes": all_heroes,
     }
 
@@ -57,7 +59,8 @@ def main():
     print(f"Pipeline steps: {bundle['metadata']['steps']}")
     print(f"Bundle keys: {list(bundle.keys())}")
     print(f"Metadata: {bundle['metadata']}")
-    print(f"Damage heroes tracked: {len(bundle['damage_heroes'])}")
+    for role, heroes in bundle["heroes_by_role"].items():
+        print(f"{role} heroes tracked: {len(heroes)}")
     print(f"All heroes tracked: {len(bundle['all_heroes'])}")
 
 
