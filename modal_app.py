@@ -5,16 +5,14 @@ app (serve.py) as a Modal web function. It does not reimplement anything:
 the recommendation algorithm, the pipeline artifact, and the API route
 definitions are all unchanged and just shipped into the image as-is.
 
-Local files shipped into the image (all required to unpickle and run
-pipeline.joblib, per inspection of pipeline_def.py / explore_recommendations.py
-/ serve.py's import statements):
-  - pipeline.joblib          the fitted sklearn pipeline bundle
-  - pipeline_def.py          defines HeroRecommenderTransformer (needed to unpickle)
-  - explore_recommendations.py  pipeline_def.py does `import explore_recommendations as er`
-                              and calls er.build_symmetric_matchup_dict /
-                              compute_pool_values / get_vulnerabilities /
-                              compute_candidate_score
-  - serve.py                 the FastAPI app itself
+Local files shipped into the image - exactly the three application files
+required (pipeline_def.py is self-contained: the matchup-matrix/pool/scoring
+helpers live there directly, so there is no runtime import of
+explore_recommendations.py):
+  - pipeline.joblib   the fitted sklearn pipeline bundle
+  - pipeline_def.py   defines HeroRecommenderTransformer and the pure
+                      scoring helpers it uses (needed to unpickle and run it)
+  - serve.py          the FastAPI app itself
 
 data/matchups.csv and data/rank_stats.csv are deliberately NOT shipped:
 pipeline.joblib already contains the fitted transformer's matchups_df and
@@ -43,17 +41,14 @@ image = (
         "joblib==1.6.0",
         "fastapi==0.141.1",
         "pydantic==2.13.5",
-        # uvicorn is not imported by serve.py/pipeline_def.py/
-        # explore_recommendations.py - Modal serves the ASGI app itself via
-        # @modal.asgi_app(), so uvicorn is not actually required at runtime
-        # here. Pinned anyway per explicit instruction; harmless to include.
+        # uvicorn is not imported by serve.py or pipeline_def.py - Modal
+        # serves the ASGI app itself via @modal.asgi_app(), so uvicorn is not
+        # actually required at runtime here. Pinned anyway per explicit
+        # instruction; harmless to include.
         "uvicorn==0.53.0",
     )
     .add_local_file("pipeline.joblib", "/root/pipeline.joblib", copy=True)
     .add_local_file("pipeline_def.py", "/root/pipeline_def.py", copy=True)
-    .add_local_file(
-        "explore_recommendations.py", "/root/explore_recommendations.py", copy=True
-    )
     .add_local_file("serve.py", "/root/serve.py", copy=True)
 )
 

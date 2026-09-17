@@ -25,8 +25,9 @@ def build_bundle():
         ]
     )
 
-    # Trivial fit: the transformer holds no learned state, it wraps a fixed
-    # deterministic scoring formula over the already-loaded matchup/rank data.
+    # fit() derives and stores the symmetric matchup matrix and hero pools as
+    # genuine fitted (trailing-underscore) attributes on the transformer -
+    # this is what gets serialized below, not recomputed at request time.
     pipeline.fit(X=[])
 
     damage_heroes = sorted(rank_df["hero_id"].unique())
