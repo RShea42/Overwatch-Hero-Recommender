@@ -1,5 +1,12 @@
-"""Load pipeline.joblib fresh from disk and verify it against the already
-validated sequential Formula C recommendations."""
+"""Load pipeline.joblib fresh from disk and verify the OLD sequential
+Formula C path (HeroRecommenderTransformer._recommend_for_request) still
+produces the already-validated results, unchanged.
+
+Note: pipeline.transform() itself now dispatches to the NEW complete-pool
+Builder/Completer architecture (see test_pool_recommender.py for its
+regression suite) - this script deliberately calls the legacy sequential
+method directly so the old behavior remains comparable against the new
+architecture, per the post-submission-development preservation requirement."""
 
 import joblib
 
@@ -16,16 +23,17 @@ def summarize(result):
 def main():
     bundle = joblib.load(PIPELINE_PATH)
     pipeline = bundle["pipeline"]
+    transformer = pipeline.named_steps["recommender"]
 
     print(f"Loaded bundle. Metadata: {bundle['metadata']}")
 
     requests = [
-        {"heroes": ["soldier-76"], "rank": "Silver", "input": "PC", "region": "Americas"},
-        {"heroes": ["tracer"], "rank": "Silver", "input": "PC", "region": "Americas"},
-        {"heroes": ["soldier-76", "symmetra"], "rank": "Silver", "input": "PC", "region": "Americas"},
+        {"heroes": ["soldier-76"], "role": "DAMAGE", "rank": "Silver", "input": "PC", "region": "Americas"},
+        {"heroes": ["tracer"], "role": "DAMAGE", "rank": "Silver", "input": "PC", "region": "Americas"},
+        {"heroes": ["soldier-76", "symmetra"], "role": "DAMAGE", "rank": "Silver", "input": "PC", "region": "Americas"},
     ]
 
-    output = pipeline.transform(requests)
+    output = [transformer._recommend_for_request(r) for r in requests]
 
     print(f"\ntransform() return type: {type(output)}")
     print(f"transform() return length: {len(output)}")

@@ -9,12 +9,12 @@ that remains build_pipeline.py's job.
 """
 
 import logging
-from typing import List, Literal
+from typing import Literal, Optional
 
 import joblib
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, model_validator
 
 import pipeline_def  # noqa: F401  # required so joblib can resolve HeroRecommenderTransformer
 
@@ -73,32 +73,42 @@ def _unavailable_detail():
     }
 
 
-class RecommendRequest(BaseModel):
-    heroes: List[str] = Field(..., min_length=1, max_length=2)
+class PoolRequest(BaseModel):
+    """Complete-pool recommendation request.
+
+    `secondary` omitted/null -> Pool Builder (recommend two backups around
+    `main`). `secondary` supplied -> Pool Completer (recommend one tertiary
+    that best completes {main, secondary}). One endpoint, one schema, mode
+    selected by whether `secondary` is present - this intentionally replaces
+    the old `heroes: List[str]` sequential-slot schema, which encoded a
+    misleading Hero#2/Hero#3 ordering that the complete-pool architecture no
+    longer has (Builder's two backups are an unordered pair). The old
+    schema/behavior remains fully available in git history and via
+    HeroRecommenderTransformer._recommend_for_request for direct comparison.
+    """
+
     role: RoleLiteral
+    main: str
+    secondary: Optional[str] = None
     rank: RankLiteral
     input: InputLiteral
     region: RegionLiteral
 
-    @field_validator("heroes")
-    @classmethod
-    def validate_no_duplicates(cls, heroes: List[str]) -> List[str]:
-        if len(set(heroes)) != len(heroes):
-            raise ValueError("duplicate hero IDs are not allowed")
-        return heroes
-
     @model_validator(mode="after")
-    def validate_heroes_match_role(self):
-        # Hero-ID-vs-role validation depends on the loaded artifact and needs
-        # both `heroes` and `role`, hence a model-level (not field-level)
-        # validator. If the artifact isn't loaded, skip this check here and
-        # let the endpoint itself report 503 - a missing artifact is a
-        # service problem, not a client validation problem.
+    def validate_main_secondary(self):
+        if self.secondary is not None and self.secondary == self.main:
+            raise ValueError("main and secondary must be distinct heroes")
+
+        # Hero-ID-vs-role validation depends on the loaded artifact. If the
+        # artifact isn't loaded, skip this check here and let the endpoint
+        # itself report 503 - a missing artifact is a service problem, not a
+        # client validation problem.
         if _bundle is not None:
             eligible = set(_bundle["heroes_by_role"].get(self.role.upper(), []))
-            unknown = [h for h in self.heroes if h not in eligible]
-            if unknown:
-                raise ValueError(f"hero id(s) not valid for role {self.role!r}: {unknown}")
+            if self.main not in eligible:
+                raise ValueError(f"hero id {self.main!r} is not valid for role {self.role!r}")
+            if self.secondary is not None and self.secondary not in eligible:
+                raise ValueError(f"hero id {self.secondary!r} is not valid for role {self.role!r}")
         return self
 
 
@@ -154,7 +164,10 @@ def pipeline_info():
 
 
 @app.post("/recommend")
-def recommend(request: RecommendRequest):
+def recommend(request: PoolRequest):
+    """Complete-pool recommendation. `secondary` omitted -> Builder mode
+    (recommend two backups). `secondary` supplied -> Completer mode
+    (recommend one tertiary). See PoolRequest for the mode-selection rule."""
     if _bundle is None:
         raise HTTPException(status_code=503, detail=_unavailable_detail())
 
