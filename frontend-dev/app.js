@@ -4,8 +4,8 @@ const API_BASE_URL = "https://rshea42--overwatch-hero-recommender-dev-fastapi-ap
 const RECOMMEND_URL = `${API_BASE_URL}/recommend`;
 
 const roleSelect = document.getElementById("role");
-const hero1Select = document.getElementById("hero1");
-const hero2Select = document.getElementById("hero2");
+const mainSelect = document.getElementById("main");
+const secondarySelect = document.getElementById("secondary");
 const rankSelect = document.getElementById("rank");
 const inputSelect = document.getElementById("input");
 const regionSelect = document.getElementById("region");
@@ -22,33 +22,71 @@ const contextRole = document.getElementById("context-role");
 const contextRank = document.getElementById("context-rank");
 const contextInput = document.getElementById("context-input");
 const contextRegion = document.getElementById("context-region");
-const stepsContainer = document.getElementById("steps");
+
+const poolHeading = document.getElementById("pool-heading");
 const finalPoolContainer = document.getElementById("final-pool");
-const finalNegativeEl = document.getElementById("final-negative");
+
+const coverageBefore = document.getElementById("coverage-before");
+const coverageAfter = document.getElementById("coverage-after");
+const statResolvedValue = document.getElementById("stat-resolved-value");
+const statSeverityValue = document.getElementById("stat-severity-value");
+const coveragePositive = document.getElementById("coverage-positive");
+const coverageWorst = document.getElementById("coverage-worst");
+const remainingToggle = document.getElementById("remaining-toggle");
+const remainingSummary = document.getElementById("remaining-summary");
+const remainingList = document.getElementById("remaining-list");
+const resolvedToggle = document.getElementById("resolved-toggle");
+const resolvedSummary = document.getElementById("resolved-summary");
+const resolvedList = document.getElementById("resolved-list");
+
+const wrGrid = document.getElementById("wr-grid");
+
+const unknownCaveat = document.getElementById("unknown-caveat");
+const unknownList = document.getElementById("unknown-list");
+
+const searchDetails = document.getElementById("search-details");
+const searchDetailsBody = document.getElementById("search-details-body");
 
 function populateHeroSelects() {
   const role = roleSelect.value;
   const heroes = [...(HEROES_BY_ROLE[role] || [])].sort((a, b) => a.name.localeCompare(b.name));
 
-  hero1Select.innerHTML = "";
-  hero2Select.innerHTML = '<option value="">None</option>';
+  mainSelect.innerHTML = "";
+  secondarySelect.innerHTML = '<option value="">None</option>';
 
   for (const hero of heroes) {
     const opt1 = document.createElement("option");
     opt1.value = hero.id;
     opt1.textContent = hero.name;
-    hero1Select.appendChild(opt1);
+    mainSelect.appendChild(opt1);
 
     const opt2 = document.createElement("option");
     opt2.value = hero.id;
     opt2.textContent = hero.name;
-    hero2Select.appendChild(opt2);
+    secondarySelect.appendChild(opt2);
   }
 
   // Default starting hero for Damage, matching the already-verified test
   // case; otherwise just leave the first option selected.
   if (role === "Damage") {
-    hero1Select.value = "soldier-76";
+    mainSelect.value = "soldier-76";
+  }
+
+  // Role changed: the previously selected Secondary may no longer exist in
+  // this role's list (or may now equal Main) - reset it rather than leave a
+  // stale/invalid selection.
+  secondarySelect.value = "";
+  updateActionLabel();
+}
+
+function updateActionLabel() {
+  submitBtn.textContent = secondarySelect.value ? "Complete My Pool" : "Build My Pool";
+}
+
+function enforceMainSecondaryDistinct() {
+  if (secondarySelect.value && secondarySelect.value === mainSelect.value) {
+    secondarySelect.value = "";
+    updateActionLabel();
   }
 }
 
@@ -64,110 +102,20 @@ function showFormError(message) {
   formError.hidden = !message;
 }
 
-function heroPill(id, kind) {
-  const span = document.createElement("span");
-  span.className = `hero-pill ${kind}`;
-  span.textContent = heroName(id);
-  return span;
+function clearResults() {
+  finalPoolContainer.innerHTML = "";
+  remainingList.innerHTML = "";
+  resolvedList.innerHTML = "";
+  unknownList.innerHTML = "";
+  wrGrid.innerHTML = "";
+  coveragePositive.hidden = true;
+  coverageWorst.hidden = true;
+  unknownCaveat.hidden = true;
 }
 
-function statBox(label, value, kind) {
-  const box = document.createElement("div");
-  box.className = `stat-box ${kind}`;
-  const l = document.createElement("span");
-  l.className = "stat-label";
-  l.textContent = label;
-  const v = document.createElement("span");
-  v.className = "stat-value";
-  v.textContent = value;
-  box.appendChild(l);
-  box.appendChild(v);
-  return box;
-}
-
-function heroChip(id) {
-  const span = document.createElement("span");
-  span.className = "chip";
-  span.textContent = heroName(id);
-  return span;
-}
-
-function matchupToggle(label, heroIds) {
-  const details = document.createElement("details");
-  details.className = "matchup-toggle";
-
-  const summary = document.createElement("summary");
-  summary.textContent = `${label} (${heroIds.length}) – view matchups`;
-  details.appendChild(summary);
-
-  const content = document.createElement("div");
-  content.className = "chip-list";
-
-  if (heroIds.length === 0) {
-    const empty = document.createElement("span");
-    empty.className = "chip-list-empty";
-    empty.textContent = "None — full known coverage";
-    content.appendChild(empty);
-  } else {
-    [...heroIds]
-      .sort((a, b) => heroName(a).localeCompare(heroName(b)))
-      .forEach((id) => content.appendChild(heroChip(id)));
-  }
-
-  details.appendChild(content);
-  return details;
-}
-
-function renderStep(stepNumber, rec, isTwoHeroInput) {
-  const card = document.createElement("div");
-  card.className = "step-card";
-
-  const heading = document.createElement("h4");
-  heading.textContent = isTwoHeroInput
-    ? "Recommended Hero #3"
-    : `Recommended Hero #${stepNumber}`;
-  card.appendChild(heading);
-
-  const rosterRow = document.createElement("div");
-  rosterRow.className = "step-roster";
-  rec.roster_before.forEach((id) => rosterRow.appendChild(heroPill(id, "existing")));
-  const arrow = document.createElement("span");
-  arrow.className = "arrow";
-  arrow.textContent = "→";
-  rosterRow.appendChild(arrow);
-  rosterRow.appendChild(heroPill(rec.recommended_hero, "recommended"));
-  card.appendChild(rosterRow);
-
-  const grid = document.createElement("div");
-  grid.className = "stat-grid";
-  grid.appendChild(statBox("Vulnerabilities Before", rec.vulnerabilities_before, "coverage"));
-  grid.appendChild(statBox("Vulnerabilities Resolved", rec.vulnerabilities_resolved, "coverage"));
-  grid.appendChild(statBox("Remaining Unfavorable", rec.remaining_negative_count, "coverage"));
-  grid.appendChild(
-    statBox("Contextual Win Rate", formatPercent(rec.contextual_winrate), "winrate")
-  );
-  grid.appendChild(
-    statBox("Contextual Pick Rate", formatPercent(rec.contextual_pickrate), "pickrate")
-  );
-  grid.appendChild(
-    statBox("Contextual Ban Rate", formatPercent(rec.contextual_banrate), "banrate")
-  );
-  card.appendChild(grid);
-
-  const matchupSection = document.createElement("div");
-  matchupSection.className = "matchup-toggles";
-  matchupSection.appendChild(
-    matchupToggle("Vulnerabilities Before", rec.vulnerability_heroes_before)
-  );
-  matchupSection.appendChild(
-    matchupToggle("Vulnerabilities Resolved", rec.vulnerability_heroes_resolved)
-  );
-  matchupSection.appendChild(
-    matchupToggle("Remaining Unfavorable", rec.remaining_negative_heroes)
-  );
-  card.appendChild(matchupSection);
-
-  return card;
+function titleCase(value) {
+  if (!value) return "";
+  return value.charAt(0) + value.slice(1).toLowerCase();
 }
 
 function formatPercent(value) {
@@ -175,35 +123,180 @@ function formatPercent(value) {
   return `${value}%`;
 }
 
-function renderResults(payload, isTwoHeroInput) {
-  contextRole.textContent = `Role: ${payload.role}`;
-  contextRank.textContent = `Rank: ${payload.rank}`;
-  contextInput.textContent = `Input: ${payload.input}`;
-  contextRegion.textContent = `Region: ${payload.region}`;
+function heroCard(id, slotLabel, variant) {
+  const card = document.createElement("div");
+  card.className = `final-hero-card final-hero-card--${variant}`;
+  const label = document.createElement("span");
+  label.className = "slot-label";
+  label.textContent = slotLabel;
+  const name = document.createElement("span");
+  name.className = "hero-name";
+  name.textContent = heroName(id);
+  card.appendChild(label);
+  card.appendChild(name);
+  return card;
+}
 
-  stepsContainer.innerHTML = "";
-  payload.recommendations.forEach((rec, idx) => {
-    stepsContainer.appendChild(renderStep(idx + 2, rec, isTwoHeroInput && idx === 0));
-  });
+function matchupChip(opponentId, value) {
+  const span = document.createElement("span");
+  span.className = "chip chip-matchup";
+  span.textContent = `${heroName(opponentId)} (${value})`;
+  return span;
+}
 
+function plainChip(text) {
+  const span = document.createElement("span");
+  span.className = "chip";
+  span.textContent = text;
+  return span;
+}
+
+function renderPool(payload) {
   finalPoolContainer.innerHTML = "";
-  const labels = ["Starting Hero", "Recommended #2", "Recommended #3"];
-  payload.final_roster.forEach((id, idx) => {
-    const card = document.createElement("div");
-    card.className = "final-hero-card";
-    const label = document.createElement("span");
-    label.className = "slot-label";
-    label.textContent = labels[idx] || `Slot ${idx + 1}`;
-    const name = document.createElement("span");
-    name.className = "hero-name";
-    name.textContent = heroName(id);
-    card.appendChild(label);
-    card.appendChild(name);
-    finalPoolContainer.appendChild(card);
+
+  if (payload.mode === "builder") {
+    poolHeading.textContent = "Your Recommended Pool";
+    finalPoolContainer.appendChild(heroCard(payload.main, "Your Main", "main"));
+    const backups = [payload.backup_a, payload.backup_b].sort((a, b) =>
+      heroName(a).localeCompare(heroName(b))
+    );
+    backups.forEach((id) => finalPoolContainer.appendChild(heroCard(id, "Recommended", "recommended")));
+  } else {
+    poolHeading.textContent = "Your Completed Pool";
+    finalPoolContainer.appendChild(heroCard(payload.main, "Your Main", "main"));
+    finalPoolContainer.appendChild(heroCard(payload.secondary, "Your Secondary", "given"));
+    finalPoolContainer.appendChild(
+      heroCard(payload.recommended_tertiary, "Recommended", "recommended")
+    );
+  }
+}
+
+function renderCoverage(payload) {
+  coverageBefore.textContent = payload.original_vulnerability_count;
+  coverageAfter.textContent = payload.final_residual_vulnerability_count;
+  statResolvedValue.textContent = payload.vulnerabilities_resolved_count;
+  statSeverityValue.textContent = payload.total_residual_severity;
+
+  if (payload.no_known_unfavorable_matchups_remain) {
+    coveragePositive.hidden = false;
+    coverageWorst.hidden = true;
+  } else if (payload.worst_remaining_matchup) {
+    coverageWorst.hidden = false;
+    coverageWorst.textContent = `Worst remaining matchup: ${heroName(
+      payload.worst_remaining_matchup.opponent
+    )} (${payload.worst_remaining_matchup.value})`;
+  }
+
+  remainingList.innerHTML = "";
+  const remaining = payload.remaining_vulnerabilities || [];
+  remainingSummary.textContent = `Remaining vulnerabilities (${remaining.length})`;
+  if (remaining.length === 0) {
+    remainingList.appendChild(plainChip("None"));
+  } else {
+    remaining.forEach((v) => remainingList.appendChild(matchupChip(v.opponent, v.value)));
+  }
+
+  const originalByOpponent = {};
+  (payload.original_vulnerabilities || []).forEach((v) => {
+    originalByOpponent[v.opponent] = v.value;
   });
 
-  const lastRec = payload.recommendations[payload.recommendations.length - 1];
-  finalNegativeEl.innerHTML = `Final remaining unfavorable matchups: <strong>${lastRec.remaining_negative_count}</strong>`;
+  resolvedList.innerHTML = "";
+  const resolved = payload.vulnerabilities_resolved_opponents || [];
+  resolvedSummary.textContent = `Resolved matchups (${resolved.length})`;
+  if (resolved.length === 0) {
+    resolvedList.appendChild(plainChip("None"));
+  } else {
+    resolved.forEach((opponentId) => {
+      const originalValue = originalByOpponent[opponentId];
+      resolvedList.appendChild(
+        plainChip(
+          originalValue === undefined
+            ? heroName(opponentId)
+            : `${heroName(opponentId)} (was ${originalValue})`
+        )
+      );
+    });
+  }
+}
+
+function wrStatBox(label, value, emphasize) {
+  const box = document.createElement("div");
+  box.className = `stat-box winrate${emphasize ? " winrate-emphasized" : ""}`;
+  const l = document.createElement("span");
+  l.className = "stat-label";
+  l.textContent = label;
+  const v = document.createElement("span");
+  v.className = "stat-value";
+  v.textContent = formatPercent(value);
+  box.appendChild(l);
+  box.appendChild(v);
+  return box;
+}
+
+function renderContextualWR(payload) {
+  wrGrid.innerHTML = "";
+  if (payload.mode === "builder") {
+    wrGrid.appendChild(
+      wrStatBox(`${heroName(payload.backup_a)} Win Rate`, payload.contextual_wr.backup_a, true)
+    );
+    wrGrid.appendChild(
+      wrStatBox(`${heroName(payload.backup_b)} Win Rate`, payload.contextual_wr.backup_b, true)
+    );
+  } else {
+    wrGrid.appendChild(
+      wrStatBox(
+        `${heroName(payload.secondary)} Win Rate (reference)`,
+        payload.contextual_wr.secondary,
+        false
+      )
+    );
+    wrGrid.appendChild(
+      wrStatBox(
+        `${heroName(payload.recommended_tertiary)} Win Rate (recommended)`,
+        payload.contextual_wr.tertiary,
+        true
+      )
+    );
+  }
+}
+
+function renderUnknownCaveat(payload) {
+  const caveats = payload.unknown_data_caveats || [];
+  if (caveats.length === 0) {
+    unknownCaveat.hidden = true;
+    return;
+  }
+  unknownCaveat.hidden = false;
+  unknownList.innerHTML = "";
+  caveats.forEach((c) => {
+    const missingNames = (c.backups_missing_data || []).map(heroName).join(", ");
+    unknownList.appendChild(
+      plainChip(`${heroName(c.opponent)} — no data from ${missingNames || "recommended backups"}`)
+    );
+  });
+}
+
+function renderSearchDetails(payload) {
+  const size = payload.search ? payload.search.candidate_pool_size : null;
+  const finalists = payload.search ? payload.search.pareto_frontier_size : null;
+  searchDetailsBody.textContent =
+    size !== null && finalists !== null
+      ? `Evaluated ${size} complete pools · ${finalists} finalists compared.`
+      : "";
+}
+
+function renderResults(payload) {
+  contextRole.textContent = `Role: ${titleCase(payload.role)}`;
+  contextRank.textContent = `Rank: ${payload.context.rank}`;
+  contextInput.textContent = `Input: ${payload.context.input}`;
+  contextRegion.textContent = `Region: ${payload.context.region}`;
+
+  renderPool(payload);
+  renderCoverage(payload);
+  renderContextualWR(payload);
+  renderUnknownCaveat(payload);
+  renderSearchDetails(payload);
 
   setView("results");
 }
@@ -212,28 +305,29 @@ async function handleSubmit(event) {
   event.preventDefault();
   showFormError("");
 
-  const hero1 = hero1Select.value;
-  const hero2 = hero2Select.value;
+  const main = mainSelect.value;
+  const secondary = secondarySelect.value;
 
-  if (!hero1) {
-    showFormError("Please select a starting hero.");
+  if (!main) {
+    showFormError("Please select a Main.");
     return;
   }
-  if (hero2 && hero2 === hero1) {
-    showFormError("The second hero must be different from the first.");
+  if (secondary && secondary === main) {
+    showFormError("Secondary must be different from Main.");
     return;
   }
 
-  const heroes = hero2 ? [hero1, hero2] : [hero1];
   const body = {
-    heroes,
     role: roleSelect.value,
+    main,
+    secondary: secondary || null,
     rank: rankSelect.value,
     input: inputSelect.value,
     region: regionSelect.value,
   };
 
   submitBtn.disabled = true;
+  clearResults();
   setView("loading");
 
   try {
@@ -257,7 +351,7 @@ async function handleSubmit(event) {
     }
 
     const payload = await response.json();
-    renderResults(payload, heroes.length === 2);
+    renderResults(payload);
   } catch (err) {
     statusError.textContent =
       "Could not reach the recommendation API. Check your connection and try again.";
@@ -280,4 +374,9 @@ function extractErrorMessage(errorPayload, fallback) {
 
 populateHeroSelects();
 roleSelect.addEventListener("change", populateHeroSelects);
+mainSelect.addEventListener("change", enforceMainSecondaryDistinct);
+secondarySelect.addEventListener("change", () => {
+  enforceMainSecondaryDistinct();
+  updateActionLabel();
+});
 form.addEventListener("submit", handleSubmit);

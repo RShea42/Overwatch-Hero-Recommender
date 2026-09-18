@@ -32,15 +32,19 @@
           </div>
 
           <div class="field">
-            <label for="hero1">Current Hero <span class="required">*</span></label>
-            <select id="hero1" required></select>
+            <label for="main">Main <span class="required">*</span></label>
+            <select id="main" required></select>
           </div>
 
           <div class="field">
-            <label for="hero2">Second Current Hero <span class="optional">(optional)</span></label>
-            <select id="hero2">
+            <label for="secondary">Secondary <span class="optional">(optional)</span></label>
+            <select id="secondary">
               <option value="">None</option>
             </select>
+            <p class="field-hint">
+              Leave blank to build a new pool around your Main. Add a Secondary to
+              complete an existing pool around both heroes instead.
+            </p>
           </div>
 
           <div class="field-row">
@@ -76,13 +80,13 @@
 
           <p id="form-error" class="form-error" hidden></p>
 
-          <button type="submit" id="submit-btn" class="build-btn">Build My Hero Pool</button>
+          <button type="submit" id="submit-btn" class="build-btn">Build My Pool</button>
         </form>
       </section>
 
       <section class="panel results-panel">
         <div id="status-empty" class="status-message">
-          Select your hero(s) and context, then build your pool.
+          Select your Main and context, then build your pool.
         </div>
 
         <div id="status-loading" class="status-message" hidden>
@@ -100,13 +104,70 @@
             <span class="context-chip" id="context-region"></span>
           </div>
 
-          <div id="steps"></div>
-
           <div class="final-pool-wrapper">
-            <h3>Completed Three-Hero Pool</h3>
+            <h3 id="pool-heading">Your Recommended Pool</h3>
             <div class="final-pool" id="final-pool"></div>
-            <p class="final-negative" id="final-negative"></p>
           </div>
+
+          <div class="coverage-section">
+            <h3>Matchup Coverage</h3>
+            <div class="coverage-transition">
+              <div class="coverage-number">
+                <span class="coverage-number-value" id="coverage-before"></span>
+                <span class="coverage-number-label">Original vulnerabilities</span>
+              </div>
+              <span class="coverage-arrow" aria-hidden="true">&rarr;</span>
+              <div class="coverage-number">
+                <span class="coverage-number-value" id="coverage-after"></span>
+                <span class="coverage-number-label">Remaining vulnerabilities</span>
+              </div>
+            </div>
+
+            <div class="stat-grid">
+              <div class="stat-box coverage" id="stat-resolved">
+                <span class="stat-label">Vulnerabilities Resolved</span>
+                <span class="stat-value" id="stat-resolved-value"></span>
+              </div>
+              <div class="stat-box coverage" id="stat-severity">
+                <span class="stat-label">Total Residual Severity</span>
+                <span class="stat-value" id="stat-severity-value"></span>
+              </div>
+            </div>
+
+            <p class="coverage-positive" id="coverage-positive" hidden>
+              No known unfavorable matchups remain.
+            </p>
+            <p class="coverage-worst" id="coverage-worst" hidden></p>
+
+            <details class="matchup-toggle" id="remaining-toggle">
+              <summary id="remaining-summary">Remaining vulnerabilities</summary>
+              <div class="chip-list" id="remaining-list"></div>
+            </details>
+
+            <details class="matchup-toggle matchup-toggle-secondary" id="resolved-toggle">
+              <summary id="resolved-summary">Resolved matchups</summary>
+              <div class="chip-list" id="resolved-list"></div>
+            </details>
+          </div>
+
+          <div class="wr-section">
+            <h3>Contextual Win Rate</h3>
+            <div class="stat-grid" id="wr-grid"></div>
+          </div>
+
+          <div class="caveat-box" id="unknown-caveat" hidden>
+            <p class="caveat-heading">Some matchup data is unavailable</p>
+            <p class="caveat-body">
+              We do not have matchup data for these opponents against the recommended
+              backups &mdash; this means <strong>unknown</strong>, not a bad matchup.
+            </p>
+            <div class="chip-list" id="unknown-list"></div>
+          </div>
+
+          <details class="matchup-toggle matchup-toggle-secondary" id="search-details">
+            <summary>Search details</summary>
+            <p class="search-details-body" id="search-details-body"></p>
+          </details>
         </div>
       </section>
     </main>
